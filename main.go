@@ -44,6 +44,10 @@ func Reader(m disgo.Message) string {
 		return ""
 
 	default:
+		if len(str) > 2 {
+			return ""
+		}
+
 		switch str[0:2] {
 		case "/s": // starting a conversation
 			if i := strings.Index(str, " "); -1 != i {
