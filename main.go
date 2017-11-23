@@ -21,11 +21,11 @@ func Reader(m disgo.Message) string {
 	switch str {
 
 	case "hi":
-		return "Hello\n"
+		return "Hello\r\n"
 
 	case "exit":
 		if _, keyExists := replyChannel[m.Worker.ID]; keyExists {
-			m.Worker.Swarm.Workers[replyChannel[m.Worker.ID]].WriteString("Worker [" + m.Worker.ID + "] has disconnected.\n")
+			m.Worker.Swarm.Workers[replyChannel[m.Worker.ID]].WriteString("Worker [" + m.Worker.ID + "] has disconnected.\r\n")
 			delete(replyChannel, replyChannel[m.Worker.ID])
 			delete(replyChannel, m.Worker.ID)
 		}
@@ -38,7 +38,7 @@ func Reader(m disgo.Message) string {
 		for i := range m.Worker.Swarm.Workers {
 			l = append(l, i)
 		}
-		return strings.Join(l, "\n") + "\n"
+		return strings.Join(l, "\r\n") + "\r\n"
 
 	case "": // fix slice error. not elegant :)
 		return ""
@@ -51,11 +51,11 @@ func Reader(m disgo.Message) string {
 				if w, keyExists := m.Worker.Swarm.Workers[id]; keyExists {
 					replyChannel[id] = m.Worker.ID
 					replyChannel[m.Worker.ID] = id
-					w.WriteString(m.Worker.ID + "> " + m.Content[i+1:len(m.Content)] + "/r to reply.\n")
+					w.WriteString(m.Worker.ID + "> " + m.Content[i+1:len(m.Content)] + "/r to reply.\r\n")
 					return ""
 				}
 
-				return "Worker [" + id + "] does not exist.\n"
+				return "Worker [" + id + "] does not exist.\r\n"
 			}
 
 		case "/r": // replying to a conversation
@@ -67,14 +67,14 @@ func Reader(m disgo.Message) string {
 
 				delete(replyChannel, id)
 				delete(replyChannel, m.Worker.ID)
-				return "Cannot Send message to disconnected Worker [" + id + "].\n"
+				return "Cannot Send message to disconnected Worker [" + id + "].\r\n"
 			}
 
-			return "No conversation was set. Use /s<user> <message> to start a conversation.\n"
+			return "No conversation was set. Use /s<user> <message> to start a conversation.\r\n"
 		}
 	}
 
-	return "Unkown command!\n"
+	return "Unkown command!\r\n"
 }
 
 func main() {
