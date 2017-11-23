@@ -9,15 +9,79 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gianebao/dgochat/hive"
+	"github.com/gianebao/disgo"
+	"github.com/gianebao/disgo/log"
 )
 
-func main() {
+var replyChannel = map[string]string{}
 
+func Reader(m disgo.Message) string {
+
+	str := strings.ToLower(strings.TrimRight(m.Content, "\r\n"))
+	switch str {
+
+	case "hi":
+		return "Hello\n"
+
+	case "exit":
+		if _, keyExists := replyChannel[m.Worker.ID]; keyExists {
+			m.Worker.Swarm.Workers[replyChannel[m.Worker.ID]].WriteString("Worker [" + m.Worker.ID + "] has disconnected.\n")
+			delete(replyChannel, replyChannel[m.Worker.ID])
+			delete(replyChannel, m.Worker.ID)
+		}
+
+		m.Worker.Die()
+
+	case "list":
+		l := []string{}
+
+		for i := range m.Worker.Swarm.Workers {
+			l = append(l, i)
+		}
+		return strings.Join(l, "\n") + "\n"
+
+	case "": // fix slice error. not elegant :)
+		return ""
+
+	default:
+		switch str[0:2] {
+		case "/s": // starting a conversation
+			if i := strings.Index(str, " "); -1 != i {
+				id := str[2:i]
+				if w, keyExists := m.Worker.Swarm.Workers[id]; keyExists {
+					replyChannel[id] = m.Worker.ID
+					replyChannel[m.Worker.ID] = id
+					w.WriteString(m.Worker.ID + "> " + m.Content[i+1:len(m.Content)] + "/r to reply.\n")
+					return ""
+				}
+
+				return "Worker [" + id + "] does not exist.\n"
+			}
+
+		case "/r": // replying to a conversation
+			if id, rExists := replyChannel[m.Worker.ID]; rExists {
+				if w, keyExists := m.Worker.Swarm.Workers[id]; keyExists {
+					w.WriteString(m.Worker.ID + "> " + m.Content[3:len(m.Content)])
+					return ""
+				}
+
+				delete(replyChannel, id)
+				delete(replyChannel, m.Worker.ID)
+				return "Cannot Send message to disconnected Worker [" + id + "].\n"
+			}
+
+			return "No conversation was set. Use /s<user> <message> to start a conversation.\n"
+		}
+	}
+
+	return "Unkown command!\n"
+}
+
+func main() {
 	var (
 		port     = flag.Int("port", 60217, "listening port")
 		portStr  = strconv.Itoa(*port)
-		swarm    *hive.Swarm
+		swarm    *disgo.Swarm
 		listener net.Listener
 		conn     net.Conn
 		err      error
@@ -30,9 +94,9 @@ func main() {
 
 	fmt.Printf("Server now listening to [:%d]. Waiting for incoming connections.\n", *port)
 
-	logchan := hive.NewLogchan()
+	logchan := log.NewChannel()
 
-	go func(l *hive.Logchan) {
+	go func(l *log.Channel) {
 		var msg string
 		for {
 			select {
@@ -55,18 +119,9 @@ func main() {
 		}
 	}(logchan)
 
-	swarm = hive.NewSwarm(logchan).
+	swarm = disgo.NewSwarm(logchan).
 		HandleNewConnections(nil).
-		HandleRead(func(m hive.Message) string {
-			switch strings.ToUpper(strings.TrimRight(m.Content, "\r\n")) {
-			case "HI":
-				return "Hello\n"
-			case "EXIT":
-				m.Worker.Die()
-			}
-
-			return ""
-		})
+		Reader(Reader)
 
 	for {
 		if conn, err = listener.Accept(); err != nil {
