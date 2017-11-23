@@ -44,7 +44,7 @@ func Reader(m disgo.Message) string {
 		return ""
 
 	default:
-		if len(str) > 2 {
+		if len(str) <= 2 {
 			return ""
 		}
 
